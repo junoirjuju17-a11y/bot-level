@@ -55,7 +55,7 @@ Faire un clic droit sur le salon de destination, puis **Copier l’identifiant d
 
 ## 9. Remplir `.env`
 
-Un fichier `.env` vide est fourni localement. Après un clone Git, le créer depuis l’exemple :
+Le fichier `.env` reste local et ne figure pas sur GitHub. Après un clone Git, le créer depuis l’exemple :
 
 PowerShell :
 
@@ -82,7 +82,7 @@ Mettre le token brut, sans préfixe `Bot `, et les IDs numériques sans `<@...>`
 
 ## 10. Installer les dépendances
 
-Dans le terminal, se placer dans le dossier `discord-role-bot`, puis exécuter :
+Dans le terminal, se placer dans le dossier `bot-level`, puis exécuter :
 
 ```sh
 npm install

@@ -100,3 +100,59 @@ test('promotion : canal et message configurés, seul le membre est notifié', as
   assert.equal(messages[0].content, `Bravo <@456789012345678901> pour <@&${ids[2]}> @everyone`);
   assert.deepEqual(messages[0].allowedMentions, { parse: [], users: ['456789012345678901'], roles: [] });
 });
+
+test('ajout staff persistant, doublons refusés et promotion vers le nouveau grade', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'grade-add-'));
+  try {
+    const settings = openSettings(config, dir);
+    const id = '987654321098765432';
+    const roles = new Map(GRADE_NAMES.map((name, i) => [ids[i], { id: ids[i], name }]));
+    roles.set(id, { id, name: 'Nouveau grade', managed: false });
+    const handler = createCommandHandler({ config, settings, onError: assert.fail });
+    const make = (selected = id, staff = true) => {
+      const value = interaction('grade-ajouter', staff);
+      value.options.getRole = () => ({ id: selected });
+      value.guild = { roles: { fetch: async () => roles } };
+      return value;
+    };
+    await handler(make(id, false));
+    assert.deepEqual(settings.get().additionalRoleIds, []);
+    await handler(make());
+    await handler(make());
+    await handler(make(ids[0]));
+    assert.deepEqual(settings.get().additionalRoleIds, [id]);
+    const loaded = openSettings(config, dir);
+    assert.deepEqual(loaded.get().additionalRoleIds, [id]);
+    roles.get(id).name = 'Renommé';
+    const grades = resolveGrades(roles, loaded.get().additionalRoleIds);
+    assert.equal(grades.at(-1), id);
+    const next = member([6]); next.roles.cache.set(id, {});
+    assert.equal(promotedGrade(member([6]), next, grades), id);
+    assert.equal(promotedGrade(next, next, grades), null);
+    roles.delete(id);
+    assert.deepEqual(resolveGrades(roles, [id]), ids);
+    loaded.get().additionalRoleIds.push(ids[0]);
+    assert.deepEqual(loaded.get().additionalRoleIds, [id]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('migration des réglages et validation des rôles sauvegardés', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'grade-migrate-'));
+  try {
+    writeFileSync(join(dir, `settings-${config.GUILD_ID}.json`), JSON.stringify({ version: 1, channelId: null, template: 'Bravo {membre}' }));
+    const settings = openSettings(config, dir);
+    assert.deepEqual(settings.get().additionalRoleIds, []);
+    assert.equal(settings.get().template, 'Bravo {membre}');
+    assert.throws(() => settings.update({ additionalRoleIds: ['invalid'] }), /invalide/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('ajout refuse everyone, rôles gérés et rôles supprimés', async () => {
+  for (const role of [null, { id: config.GUILD_ID }, { id: ids[0], managed: true }]) {
+    const value = interaction('grade-ajouter');
+    value.options.getRole = () => ({ id: role?.id ?? ids[0] });
+    value.guild = { roles: { fetch: async () => new Map(role ? [[role.id, role]] : []) } };
+    await createCommandHandler({ config, settings: { update: () => assert.fail('Ne doit pas sauvegarder') }, onError: assert.fail })(value);
+    assert.match(value.replies.at(-1), /Choisis un rôle/);
+  }
+});

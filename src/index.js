@@ -31,7 +31,7 @@ try {
     isReady: () => initialized && client.isReady(),
     getChannel,
     settings,
-    getGradeIds: () => resolveGrades(client.guilds.cache.get(config.GUILD_ID).roles.cache),
+    getGradeIds: () => resolveGrades(client.guilds.cache.get(config.GUILD_ID).roles.cache, settings.get().additionalRoleIds),
     onError: logError,
     onSent: (userId, roleId) => console.log(`[Annonce] Grade ${roleId} atteint par ${userId}.`),
   }));
@@ -50,7 +50,7 @@ try {
       // Constitue uniquement le cache de référence, sans aucune annonce rétroactive.
       await guild.members.fetch({ time: 120_000 });
       initialized = true;
-      console.log('[Prêt] Surveillance des sept grades. Configuration : /grade-canal et /grade-message.');
+      console.log('[Prêt] Surveillance des grades. Configuration : /grade-canal, /grade-message et /grade-ajouter.');
     } catch (error) {
       logError(error);
       process.exitCode = 1;

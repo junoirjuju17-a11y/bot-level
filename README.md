@@ -24,6 +24,9 @@ Les commandes sont enregistrées automatiquement dans le serveur au démarrage. 
 
 - `/grade-canal canal:#annonces` : choisit un salon textuel ou d’annonces. Le bot vérifie ses permissions avant de sauvegarder.
 - `/grade-message texte:🎉 Bravo {membre}, tu passes au grade {grade} !` : personnalise le message.
+- `/grade-ajouter role:@NouveauGrade` : ajoute un rôle existant à la fin de la liste, comme **palier le plus élevé**, après les sept grades initiaux et les ajouts précédents. Réservé au même staff. Les doublons, @everyone et rôles gérés par une intégration sont refusés. Cela ne crée pas de rôle et ne l’attribue à personne. Aucune annonce rétroactive n’est envoyée aux membres qui le possèdent déjà.
+
+Les rôles ajoutés sont sauvegardés par ID avec les autres réglages : ils restent surveillés après renommage et redémarrage. Les anciens fichiers de configuration sont automatiquement compatibles. Un rôle supprimé du serveur est ignoré. Sur Railway, utiliser le volume persistant décrit ci-dessous pour conserver aussi cette liste après redéploiement.
 
 `{membre}` est obligatoire et devient une véritable mention de la personne. `{grade}` devient la mention du rôle, sans notifier tous ses membres. Les autres mentions, dont @everyone et @here, ne déclenchent pas de notifications. Les préférences Discord du membre peuvent limiter ses notifications. Écrire `\n` dans le texte pour un retour à la ligne. Le texte final doit tenir dans 2000 caractères. Les confirmations des commandes sont privées (éphémères).
 

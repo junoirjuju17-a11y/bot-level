@@ -2,31 +2,38 @@ import dotenv from 'dotenv';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { readConfig, describeError } from './config.js';
 import { createRoleUpdateHandler, validateChannel } from './bot.js';
+import { openSettings, resolveGrades, GRADE_NAMES } from './settings.js';
+import { commands, createCommandHandler } from './commands.js';
 
 dotenv.config({ path: new URL('../.env', import.meta.url), quiet: true });
 
 let client;
 try {
   const config = readConfig();
+  const settings = openSettings(config);
   client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
   let initialized = false;
   const logError = error => console.error(`[Erreur] ${describeError(error, config.DISCORD_TOKEN)}`);
-  const getChannel = async () => {
+  const getChannel = async (channelId = settings.get().channelId) => {
+    if (!channelId) throw new Error('Aucun canal configuré : utiliser /grade-canal.');
     const guild = client.guilds.cache.get(config.GUILD_ID);
     if (!guild?.available) throw new Error('Serveur configuré indisponible.');
     const [channel, me] = await Promise.all([
-      guild.channels.fetch(config.CHANNEL_ID, { force: true }),
+      guild.channels.fetch(channelId, { force: true }),
       guild.members.fetchMe(),
     ]);
     return validateChannel(channel, config.GUILD_ID, me);
   };
+  client.on(Events.InteractionCreate, createCommandHandler({ config, settings, checkChannel: getChannel, onError: logError }));
 
   client.on(Events.GuildMemberUpdate, createRoleUpdateHandler({
     config,
     isReady: () => initialized && client.isReady(),
     getChannel,
+    settings,
+    getGradeIds: () => resolveGrades(client.guilds.cache.get(config.GUILD_ID).roles.cache),
     onError: logError,
-    onSent: userId => console.log(`[Annonce] Rôle ${config.ROLE_ID} ajouté à ${userId}.`),
+    onSent: (userId, roleId) => console.log(`[Annonce] Grade ${roleId} atteint par ${userId}.`),
   }));
 
   client.once(Events.ClientReady, async readyClient => {
@@ -34,13 +41,16 @@ try {
     try {
       const guild = readyClient.guilds.cache.get(config.GUILD_ID);
       if (!guild) throw new Error('GUILD_ID introuvable : invitez le bot sur ce serveur et vérifiez son ID.');
-      const role = await guild.roles.fetch(config.ROLE_ID);
-      if (!role) throw new Error('ROLE_ID introuvable dans le serveur configuré.');
-      await getChannel();
+      await guild.roles.fetch();
+      const gradeIds = resolveGrades(guild.roles.cache);
+      gradeIds.forEach((id, index) => { if (!id) console.warn(`[Grades] Rôle absent ou nom en double : ${GRADE_NAMES[index]}. Ce palier sera ignoré.`); });
+      // Crée/met à jour uniquement nos commandes, sans effacer les autres commandes du bot.
+      for (const command of commands) await guild.commands.create(command);
+      try { await getChannel(); } catch (error) { logError(error); }
       // Constitue uniquement le cache de référence, sans aucune annonce rétroactive.
       await guild.members.fetch({ time: 120_000 });
       initialized = true;
-      console.log(`[Prêt] Surveillance du rôle ${role.name}. Aucun message envoyé au démarrage.`);
+      console.log('[Prêt] Surveillance des sept grades. Configuration : /grade-canal et /grade-message.');
     } catch (error) {
       logError(error);
       process.exitCode = 1;

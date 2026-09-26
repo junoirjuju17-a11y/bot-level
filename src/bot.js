@@ -1,4 +1,5 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
+import { promotedGrade } from './settings.js';
 
 // Personnalisez le texte ici. Les mentions sont limitées aux IDs explicitement autorisés.
 export function createMessage(userId, roleId) {
@@ -21,18 +22,23 @@ export function validateChannel(channel, guildId, botMember) {
   return channel;
 }
 
-export function createRoleUpdateHandler({ config, isReady, getChannel, onError, onSent = () => {} }) {
+export function createRoleUpdateHandler({ config, isReady, getChannel, onError, onSent = () => {}, settings, getGradeIds }) {
   return async (oldMember, newMember) => {
     if (!isReady() || newMember.guild.id !== config.GUILD_ID) return;
     // Un état incomplet ne prouve pas un ajout : ne jamais le deviner via un fetch après coup.
     if (oldMember.partial || newMember.partial) return;
-    const hadRole = oldMember.roles.cache.has(config.ROLE_ID);
-    const hasRole = newMember.roles.cache.has(config.ROLE_ID);
-    if (hadRole || !hasRole) return;
+    const roleId = getGradeIds ? promotedGrade(oldMember, newMember, getGradeIds())
+      : (!oldMember.roles.cache.has(config.ROLE_ID) && newMember.roles.cache.has(config.ROLE_ID) ? config.ROLE_ID : null);
+    if (!roleId) return;
     try {
-      const channel = await getChannel();
-      await channel.send(createMessage(newMember.id, config.ROLE_ID));
-      onSent(newMember.id);
+      const current = settings?.get();
+      const message = current ? {
+        content: current.template.replaceAll('{membre}', `<@${newMember.id}>`).replaceAll('{grade}', `<@&${roleId}>`),
+        allowedMentions: { parse: [], users: [newMember.id], roles: [] },
+      } : createMessage(newMember.id, roleId);
+      const channel = await getChannel(current?.channelId);
+      await channel.send(message);
+      onSent(newMember.id, roleId);
     } catch (error) {
       onError(error);
     }

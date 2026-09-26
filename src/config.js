@@ -1,9 +1,10 @@
 export function readConfig(env = process.env) {
   const keys = ['DISCORD_TOKEN', 'GUILD_ID', 'ROLE_ID', 'CHANNEL_ID'];
   const config = Object.fromEntries(keys.map(key => [key, env[key]?.trim()]));
-  const missing = keys.filter(key => !config[key]);
+  const missing = ['DISCORD_TOKEN', 'GUILD_ID'].filter(key => !config[key]);
   if (missing.length) throw new Error(`Variables manquantes dans .env : ${missing.join(', ')}.`);
   for (const key of keys.slice(1)) {
+    if (!config[key]) continue;
     if (!/^[1-9]\d{16,19}$/.test(config[key]) || BigInt(config[key]) > 18446744073709551615n) {
       throw new Error(`${key} doit être un ID Discord numérique valide (copié en mode développeur).`);
     }
